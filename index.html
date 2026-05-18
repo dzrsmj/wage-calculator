@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI工资实时计算器 - 看看你每秒钟赚多少钱</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --gold: #f0b90b;
+    --gold-dark: #c9940a;
+    --text: #e0e0e0;
+    --sub: #888;
+    --border: #2a2a2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  .container { max-width: 480px; width: 100%; }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin: 30px 0 20px;
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    background: linear-gradient(135deg, #f0b90b, #fcd535, #f0b90b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header p {
+    font-size: 0.85rem;
+    color: var(--sub);
+  }
+
+  /* Input card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sub);
+    margin-bottom: 14px;
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+  }
+  .form-group:last-child { margin-bottom: 0; }
+
+  .form-label {
+    display: block;
+    font-size: 0.82rem;
+    color: #aaa;
+    margin-bottom: 5px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+  }
+  .input-row .form-group { flex: 1; margin-bottom: 0; }
+
+  input {
+    width: 100%;
+    padding: 11px 14px;
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    transition: border 0.2s;
+  }
+  input:focus { border-color: var(--gold); }
+
+  input[type="time"] {
+    color-scheme: dark;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 13px;
+    background: linear-gradient(135deg, #c9940a, #e5a80e);
+    border: none;
+    border-radius: 12px;
+    color: #1a1a1a;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(240,185,11,0.3); }
+  .btn:active { transform: scale(0.98); }
+  .btn.stop {
+    background: #333;
+    color: #999;
+  }
+  .btn.stop:hover { box-shadow: none; }
+  .btn.restart {
+    background: linear-gradient(135deg, #c9940a, #e5a80e);
+    color: #1a1a1a;
+    margin-bottom: 10px;
+  }
+  .btn.restart:hover { box-shadow: 0 4px 20px rgba(240,185,11,0.3); }
+  .btn.reset-btn {
+    background: transparent;
+    border: 1px solid #444;
+    color: #999;
+    font-weight: 500;
+  }
+  .btn.reset-btn:hover {
+    border-color: #888;
+    color: #ccc;
+  }
+
+  /* Result summary */
+  .result-summary {
+    display: none;
+    background: #1e1a0e;
+    border: 1px solid #3d3500;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+    animation: fadeUp 0.35s ease;
+  }
+  .result-summary.show { display: block; }
+  .result-summary .result-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.88rem;
+  }
+  .result-summary .result-row .val { font-weight: 700; color: var(--gold); }
+
+  .counter-stage {
+    display: none;
+    text-align: center;
+    animation: fadeUp 0.4s ease;
+  }
+  .counter-stage.active { display: block; }
+  .counter-stage.stopped .big-number {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .big-number {
+    font-size: 3.5rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-family: 'SF Mono', 'JetBrains Mono', 'Consolas', monospace;
+    color: var(--gold);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .big-number .currency {
+    font-size: 1.8rem;
+    vertical-align: top;
+    margin-right: 2px;
+  }
+
+  .sub-metrics {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 16px 0;
+  }
+  .metric {
+    text-align: center;
+  }
+  .metric .value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  .metric .label {
+    font-size: 0.7rem;
+    color: var(--sub);
+    margin-top: 2px;
+  }
+
+  /* Progress bar for day */
+  .progress-wrap {
+    margin: 8px 0 0;
+    background: #252525;
+    border-radius: 8px;
+    height: 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+    border-radius: 8px;
+    transition: width 1s linear;
+    width: 0%;
+  }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--sub);
+    margin-top: 6px;
+  }
+
+  /* Coin rain */
+  .coin {
+    position: fixed;
+    font-size: 2rem;
+    animation: coinFall linear forwards;
+    pointer-events: none;
+    z-index: 999;
+  }
+  @keyframes coinFall {
+    0% { transform: translateY(-80px) rotate(0deg); opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(105vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* Milestone toast */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #c9940a, #e5a80e);
+    color: #1a1a1a;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    z-index: 1000;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 2s forwards;
+    pointer-events: none;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+
+  /* Share section */
+  .share-section {
+    text-align: center;
+    margin: 20px 0;
+  }
+  .share-hint {
+    font-size: 0.8rem;
+    color: var(--sub);
+    margin-bottom: 10px;
+  }
+  .share-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .share-btn {
+    padding: 10px 20px;
+    border-radius: 25px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .share-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin: 30px 0;
+    font-size: 0.75rem;
+    color: #555;
+  }
+  .footer a { color: var(--sub); text-decoration: none; }
+  .footer a:hover { color: var(--gold); }
+
+  /* Responsive */
+  @media (max-width: 400px) {
+    .big-number { font-size: 2.5rem; }
+    .sub-metrics { gap: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>&#x1F4B0; 工资实时计算器</h1>
+    <p>看看你上班的每一秒，到底值多少钱</p>
+  </div>
+
+  <!-- Input Form -->
+  <div class="card" id="inputCard">
+    <div class="card-title">&#x2699; 设置你的工作参数</div>
+    <div class="form-group">
+      <label class="form-label">月薪（税前）</label>
+      <input type="number" id="salary" placeholder="比如 15000" min="1" max="9999999">
+    </div>
+    <div class="form-group">
+      <label class="form-label">每月工作天数</label>
+      <input type="number" id="workDays" value="22" min="1" max="31" placeholder="22">
+    </div>
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label">上班时间</label>
+        <input type="time" id="startTime" value="09:00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">下班时间</label>
+        <input type="time" id="endTime" value="18:00">
+      </div>
+    </div>
+    <button class="btn" id="startBtn" onclick="startCounting()">&#x25B6; 开始计算</button>
+  </div>
+
+  <!-- Counter Display -->
+  <div class="counter-stage" id="counterStage">
+    <div class="card">
+      <div class="card-title">&#x23F1; 今天上班已赚</div>
+      <div class="big-number" id="todayAmount">
+        <span class="currency">&yen;</span>0.00
+      </div>
+      <div class="sub-metrics">
+        <div class="metric">
+          <div class="value" id="perSecond">-</div>
+          <div class="label">每秒赚</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="perMinute">-</div>
+          <div class="label">每分钟赚</div>
+        </div>
+        <div class="metric">
+          <div class="value" id="perHour">-</div>
+          <div class="label">每小时赚</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-fill" id="progressBar"></div>
+      </div>
+      <div class="info-row">
+        <span id="progressText">工作时间 0%</span>
+        <span id="dayTarget">今日目标: ¥0</span>
+      </div>
+    </div>
+
+    <!-- Stop result -->
+    <div class="result-summary" id="resultSummary">
+      <div class="card-title">&#x1F4CA; 计时结果</div>
+      <div class="result-row">
+        <span>今日已赚</span>
+        <span class="val" id="resultTotal">-</span>
+      </div>
+      <div class="result-row">
+        <span>计时时长</span>
+        <span class="val" id="resultDuration">-</span>
+      </div>
+      <div class="result-row">
+        <span>距下班还需</span>
+        <span class="val" id="resultRemaining">-</span>
+      </div>
+    </div>
+
+    <div id="btnArea">
+      <button class="btn stop" id="stopBtn" onclick="stopCounting()">&#x23F9; 停止计时</button>
+    </div>
+
+    <div class="share-section">
+      <div class="share-hint">&#x1F447; 觉得有意思？分享给朋友看看他们每秒赚多少</div>
+      <div class="share-btns">
+        <button class="share-btn" onclick="copyLink()">&#x1F517; 复制链接</button>
+        <button class="share-btn" onclick="shareWechat()">&#x1F4AC; 转发微信</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Built with AI · <a href="#" onclick="resetAll();return false">重新设置</a>
+  </div>
+</div>
+
+<script>
+let timer = null;
+let startTS = null;
+let dailyGoal = 0;
+let perSec = 0;
+let lastMilestone = -1;
+let workStartMin = 0;
+let workEndMin = 0;
+let stoppedAmount = 0;
+let stoppedTime = null;
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function formatMoney(n) {
+  return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function parseTime(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minToHM(m) {
+  return Math.floor(m / 60) + '小时' + (m % 60) + '分钟';
+}
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+};
+
+function startCounting(resume) {
+  if (!resume) {
+    const salary = parseFloat(document.getElementById('salary').value);
+    const workDays = parseInt(document.getElementById('workDays').value) || 22;
+    const startStr = document.getElementById('startTime').value;
+    const endStr = document.getElementById('endTime').value;
+
+    if (!salary || salary <= 0) {
+      document.getElementById('salary').focus();
+      return;
+    }
+
+    workStartMin = parseTime(startStr);
+    workEndMin = parseTime(endStr);
+    if (workEndMin <= workStartMin) workEndMin = workStartMin + 480;
+
+    const workMinPerDay = workEndMin - workStartMin;
+    const workSecPerMonth = workDays * workMinPerDay * 60;
+    perSec = salary / workSecPerMonth;
+    dailyGoal = perSec * workMinPerDay * 60;
+    stoppedAmount = 0;
+
+    document.getElementById('perSecond').textContent = '¥' + perSec.toFixed(4);
+    document.getElementById('perMinute').textContent = '¥' + (perSec * 60).toFixed(2);
+    document.getElementById('perHour').textContent = '¥' + (perSec * 3600).toFixed(2);
+    document.getElementById('dayTarget').textContent = '今日目标: ¥' + formatMoney(dailyGoal);
+
+    startTS = new Date(todayStr() + 'T' + startStr + ':00').getTime();
+    const now = Date.now();
+    const workEndTS = new Date(todayStr() + 'T' + endStr + ':00').getTime();
+
+    if (now > workEndTS) {
+      document.getElementById('todayAmount').innerHTML = '<span class="currency">&yen;</span>' + formatMoney(dailyGoal);
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('progressText').textContent = '已下班 · 今日目标达成';
+      document.getElementById('inputCard').style.display = 'none';
+      document.getElementById('counterStage').classList.add('active');
+      document.getElementById('resultSummary').classList.remove('show');
+      updateStopBtn(false);
+      return;
+    }
+
+    lastMilestone = Math.floor((now > startTS ? (now - startTS) / 1000 * perSec : 0) / 10);
+
+    document.getElementById('inputCard').style.display = 'none';
+    document.getElementById('counterStage').classList.add('active');
+  } else {
+    startTS = Date.now() - (stoppedAmount / perSec) * 1000;
+  }
+
+  document.getElementById('counterStage').classList.remove('stopped');
+  document.getElementById('resultSummary').classList.remove('show');
+  updateStopBtn(true);
+
+  tick();
+  timer = setInterval(tick, 200);
+}
+
+function updateStopBtn(running) {
+  var area = document.getElementById('btnArea');
+  if (running) {
+    area.innerHTML = '<button class="btn stop" id="stopBtn" onclick="stopCounting()">&#x23F9; 停止计时</button>';
+  } else {
+    area.innerHTML = '<button class="btn restart" onclick="startCounting(true)">&#x25B6; 继续计时</button><button class="btn reset-btn" style="margin-top:8px" onclick="resetAll()">&#x1F504; 重新设置</button>';
+  }
+}
+
+function tick() {
+  const now = Date.now();
+  const elapsed = Math.max(0, (now - startTS) / 1000);
+  const amount = Math.min(elapsed * perSec, dailyGoal);
+  stoppedAmount = amount;
+  stoppedTime = new Date();
+
+  document.getElementById('todayAmount').innerHTML = '<span class="currency">&yen;</span>' + formatMoney(amount);
+
+  const workMinPerDay = workEndMin - workStartMin;
+  const elapsedMin = elapsed / 60;
+  const pct = Math.min(100, (elapsedMin / workMinPerDay) * 100);
+  document.getElementById('progressBar').style.width = pct.toFixed(1) + '%';
+
+  if (pct < 100) {
+    document.getElementById('progressText').textContent = '工作时间 ' + pct.toFixed(0) + '%';
+  } else {
+    document.getElementById('progressText').textContent = '已下班 · 今日目标达成';
+    clearInterval(timer);
+    timer = null;
+    stopCounting();
+  }
+
+  const milestone = Math.floor(amount / 10);
+  if (milestone > lastMilestone) {
+    lastMilestone = milestone;
+    spawnCoins(8 + Math.floor(Math.random() * 10));
+    if (milestone % 10 === 0) {
+      showToast('&#x2728; 已赚 ¥' + milestone * 10 + '！金币掉落！');
+      spawnCoins(25 + Math.floor(Math.random() * 20));
+    }
+  }
+}
+
+function spawnCoins(count) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const coin = document.createElement('div');
+      coin.className = 'coin';
+      coin.textContent = '🪙';
+      coin.style.left = Math.random() * 90 + '%';
+      coin.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      coin.style.animationDelay = '0s';
+      coin.style.fontSize = (1.2 + Math.random() * 2.5) + 'rem';
+      document.body.appendChild(coin);
+      coin.addEventListener('animationend', () => coin.remove());
+    }, i * 80 + Math.random() * 200);
+  }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = msg;
+  document.body.appendChild(t);
+  t.addEventListener('animationend', (e) => {
+    if (e.animationName === 'toastOut') t.remove();
+  });
+}
+
+function stopCounting() {
+  if (timer) { clearInterval(timer); timer = null; }
+
+  var stage = document.getElementById('counterStage');
+  stage.classList.add('stopped');
+
+  // Show result summary
+  var summary = document.getElementById('resultSummary');
+  summary.classList.add('show');
+  document.getElementById('resultTotal').textContent = '¥' + formatMoney(stoppedAmount);
+
+  var elapsedSec = Math.floor((stoppedTime - startTS) / 1000);
+  var elapsedMin = Math.floor(elapsedSec / 60);
+  document.getElementById('resultDuration').textContent = minToHM(elapsedMin);
+
+  var remainingMin = (workEndMin - workStartMin) - elapsedMin;
+  if (remainingMin > 0 && stoppedAmount < dailyGoal) {
+    document.getElementById('resultRemaining').textContent = '约 ' + minToHM(Math.max(0, remainingMin));
+  } else if (stoppedAmount >= dailyGoal) {
+    document.getElementById('resultRemaining').textContent = '已到下班时间！';
+  } else {
+    document.getElementById('resultRemaining').textContent = '计时已完成';
+  }
+
+  updateStopBtn(false);
+}
+
+function resetAll() {
+  stopCounting();
+  document.getElementById('inputCard').style.display = '';
+  document.getElementById('counterStage').classList.remove('active');
+  document.getElementById('counterStage').classList.remove('stopped');
+  document.getElementById('resultSummary').classList.remove('show');
+  document.getElementById('btnArea').innerHTML = '<button class="btn stop" id="stopBtn" onclick="stopCounting()">&#x23F9; 停止计时</button>';
+  lastMilestone = -1;
+  stoppedAmount = 0;
+}
+
+function copyLink() {
+  var url = window.location.href;
+  navigator.clipboard.writeText(url).then(function() {
+    showToast('&#x1F4CB; 链接已复制！发给朋友试试');
+  }).catch(function() {
+    prompt('复制这个链接分享给朋友：', url);
+  });
+}
+
+function shareWechat() {
+  showToast('&#x1F4F1; 点击右上角 · 转发给朋友或朋友圈');
+}
+</script>
+
+</body>
+</html>
